@@ -1,0 +1,96 @@
+/*
+ * PrinceSec design tokens.
+ * One accent, used sparingly. Severity colours are for severity only and are always
+ * paired with a text label and icon (never colour alone).
+ */
+
+@theme {
+  /* Canvas and surfaces */
+  --color-bg: #07090c;
+  --color-surface-1: #0d1015;
+  --color-surface-2: #12161c;
+  --color-surface-3: #181d25;
+
+  /* Hairlines */
+  --color-line: rgb(255 255 255 / 0.1);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+
+  /* Text. --color-fg-3 is the quietest allowed text and still clears 4.5:1 on --color-bg. */
+  --color-fg: #f2f4f7;
+  --color-fg-2: #a9b1bc;
+  --color-fg-3: #7c8592;
+
+  /* The single accent. #7DB7FF is the approved starting value; any adjustment is
+     recorded in docs/adr/0003-design-tokens.md. */
+  --color-accent: #7db7ff;
+  --color-accent-ink: #07090c;
+
+  /* Light-band sections ("paper") for dark/light rhythm */
+  --color-paper: #f4f3ef;
+  --color-ink: #0b0d10;
+
+  /* Severity (labels and icons always accompany colour) */
+  --color-sev-critical: #ff5c6c;
+  --color-sev-high: #ff9a4d;
+  --color-sev-medium: #f5c542;
+  --color-sev-low: #5cc8a0;
+  --color-sev-info: #8c96a5;
+
+  /* Type */
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --text-display-xl: clamp(3.25rem, 1.2rem + 8.2vw, 8.5rem);
+  --text-display-xl--line-height: 0.92;
+  --text-display-xl--letter-spacing: -0.05em;
+  --text-display-xl--font-weight: 600;
+
+  --text-display: clamp(2.25rem, 1.2rem + 4vw, 5rem);
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.04em;
+  --text-display--font-weight: 600;
+
+  --text-title: clamp(1.625rem, 1.2rem + 1.6vw, 3rem);
+  --text-title--line-height: 1.1;
+  --text-title--letter-spacing: -0.03em;
+  --text-title--font-weight: 600;
+
+  --text-lead: clamp(1.125rem, 1rem + 0.6vw, 1.5rem);
+  --text-lead--line-height: 1.45;
+  --text-lead--letter-spacing: -0.01em;
+
+  --text-body: clamp(1.0625rem, 1.02rem + 0.15vw, 1.125rem);
+  --text-body--line-height: 1.6;
+
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.02em;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --ease-premium: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-micro: 120ms;
+  --duration-ui: 240ms;
+  --duration-reveal: 640ms;
+  --duration-scene: 1000ms;
+}
+
+:root {
+  --gutter: clamp(1.25rem, 0.5rem + 3.4vw, 3rem);
+  --content-max: 1320px;
+  --header-h: 4rem;
+  --section-y: clamp(4.5rem, 3rem + 7vw, 12.5rem);
+  color-scheme: dark;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --header-h: 4.5rem;
+  }
+}

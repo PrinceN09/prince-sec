@@ -1,0 +1,325 @@
+// PrinceSec data model: DRAFT, validated against Prisma 7.10.0's schema engine (WASM).
+// Not wired into the app yet. It moves to prisma/schema.prisma in Phase 2b.
+// See docs/DATA-ARCHITECTURE.md for the reasoning behind every modelling choice.
+//
+// Prisma 7 keeps connection URLs out of the schema: they live in prisma.config.ts
+// (migrations, from DIRECT_URL) and in the driver adapter (runtime, from DATABASE_URL).
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum ProjectLayout {
+  STANDARD
+  INVESTIGATION
+}
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+/// Drafts never reach the public site, whatever else is set.
+enum Visibility {
+  DRAFT
+  PUBLIC
+}
+
+enum SkillCategory {
+  SECURITY_OPERATIONS
+  OFFENSIVE_SECURITY
+  CLOUD_SECURITY
+  DEVSECOPS
+  INFRASTRUCTURE
+  DEVELOPMENT_AUTOMATION
+}
+
+enum SectionKey {
+  SUMMARY
+  SCENARIO
+  ENVIRONMENT
+  ARCHITECTURE
+  METHODOLOGY
+  DETECTION
+  INVESTIGATION
+  INDICATORS
+  FINDINGS
+  RISK_IMPACT
+  RESPONSE
+  REMEDIATION
+  OUTCOME
+  LESSONS
+}
+
+enum LearningKind {
+  CERTIFICATION
+  TRAINING
+  LEARNING_PATH
+  LAB_SERIES
+}
+
+/// For a certification, COMPLETED means earned.
+enum LearningStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ContactTopic {
+  OPPORTUNITY
+  SECURITY_ENGINEERING
+  CLOUD_SECURITY
+  DEVSECOPS
+  COLLABORATION
+  NETWORKING
+  OTHER
+}
+
+enum ContactStatus {
+  NEW
+  READ
+  REPLIED
+  SPAM
+  ARCHIVED
+}
+
+// ─────────────────────────── Taxonomy ────────────────────────────
+// Natural slug keys keep content files, seeds and URLs readable ("wazuh", "soc").
+
+model Domain {
+  id        String @id
+  name      String
+  sortOrder Int    @default(0)
+
+  projects ProjectDomain[]
+  learning LearningEntryDomain[]
+}
+
+model Tool {
+  id   String  @id
+  name String
+  url  String?
+
+  projects ProjectTool[]
+}
+
+/// Deliberately has NO proficiency or "level" column. A skill's state
+/// (Demonstrated / In Progress / Learning) is derived from evidence at read time.
+model Skill {
+  id       String        @id
+  name     String
+  category SkillCategory
+
+  projects ProjectSkill[]
+  learning LearningEntrySkill[]
+}
+
+// ───────────────────────────── Projects ──────────────────────────
+
+model Project {
+  id       String        @id @default(uuid(7))
+  slug     String        @unique
+  title    String
+  subtitle String?
+  summary  String
+  layout   ProjectLayout @default(STANDARD)
+
+  status     ProjectStatus @default(PLANNED)
+  visibility Visibility    @default(DRAFT)
+  featured   Boolean       @default(false)
+  difficulty Difficulty?
+
+  startedAt   DateTime? @db.Date
+  completedAt DateTime? @db.Date
+
+  /// Only set when public code really exists.
+  repositoryUrl String?
+
+  /// The "30-second" block shown at the top of every case study and on /glance.
+  glanceRole    String?
+  glanceScope   String?
+  glanceOutcome String?
+
+  /// Free-form classification chips, e.g. {"SOC","Blue Team","Malware Analysis"}.
+  classification String[]
+
+  /// Evidence-hygiene gate: a completed public project must have passed redaction review.
+  sanitizationReviewed Boolean @default(false)
+  sanitizationNotes    String?
+
+  heroAssetId String?
+  heroAsset   Asset?  @relation("ProjectHero", fields: [heroAssetId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  domains  ProjectDomain[]
+  tools    ProjectTool[]
+  skills   ProjectSkill[]
+  sections ProjectSection[]
+  assets   Asset[]         @relation("ProjectAssets")
+
+  @@index([visibility, status, completedAt])
+  @@index([featured])
+}
+
+/// One row per case-study section. `content` is a typed block tree: it is validated with Zod
+/// on every write and every read, and rendered by React components. It is never compiled or
+/// executed (see ADR 0004: no MDX from the database).
+model ProjectSection {
+  id             String     @id @default(uuid(7))
+  projectId      String
+  key            SectionKey
+  position       Int
+  content        Json
+  contentVersion Int        @default(1)
+  updatedAt      DateTime   @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key])
+  @@index([projectId, position])
+}
+
+model ProjectDomain {
+  projectId String
+  domainId  String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  domain  Domain  @relation(fields: [domainId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, domainId])
+  @@index([domainId])
+}
+
+model ProjectTool {
+  projectId String
+  toolId    String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tool    Tool    @relation(fields: [toolId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, toolId])
+  @@index([toolId])
+}
+
+model ProjectSkill {
+  projectId String
+  skillId   String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, skillId])
+  @@index([skillId])
+}
+
+/// Metadata only. File bytes live in object storage or the repo, never in Postgres.
+model Asset {
+  id         String  @id @default(uuid(7))
+  projectId  String?
+  storageKey String  @unique
+  mimeType   String
+  width      Int?
+  height     Int?
+  bytes      Int
+  sha256     String
+
+  /// Required and non-blank (enforced in SQL): every screenshot has alt text.
+  alt     String
+  caption String?
+
+  /// Set true only after the redaction checklist has been completed for this exact file.
+  redactionReviewed Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  project   Project?  @relation("ProjectAssets", fields: [projectId], references: [id], onDelete: Cascade)
+  heroOf    Project[] @relation("ProjectHero")
+
+  @@index([projectId])
+}
+
+// ───────────────────── Certifications and learning ────────────────
+
+model LearningEntry {
+  id           String         @id @default(uuid(7))
+  kind         LearningKind
+  status       LearningStatus @default(PLANNED)
+  title        String
+  issuer       String?
+  credentialId String?
+  credentialUrl String?
+  startedAt    DateTime?      @db.Date
+  completedAt  DateTime?      @db.Date
+  expiresAt    DateTime?      @db.Date
+  notes        String?
+  visibility   Visibility     @default(DRAFT)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  domains LearningEntryDomain[]
+  skills  LearningEntrySkill[]
+
+  @@index([visibility, kind, status])
+}
+
+model LearningEntryDomain {
+  entryId  String
+  domainId String
+
+  entry  LearningEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  domain Domain        @relation(fields: [domainId], references: [id], onDelete: Restrict)
+
+  @@id([entryId, domainId])
+  @@index([domainId])
+}
+
+model LearningEntrySkill {
+  entryId String
+  skillId String
+
+  entry LearningEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  skill Skill         @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([entryId, skillId])
+  @@index([skillId])
+}
+
+// ───────────────────────────── Contact ───────────────────────────
+// Personal data. Minimal fields, bounded lengths, automatic expiry (see DATA-ARCHITECTURE.md).
+
+model ContactMessage {
+  id      String       @id @default(uuid(7))
+  topic   ContactTopic @default(OTHER)
+  name    String       @db.VarChar(120)
+  email   String       @db.VarChar(254)
+  subject String       @db.VarChar(200)
+  message String       @db.VarChar(5000)
+  status  ContactStatus @default(NEW)
+
+  /// HMAC-SHA-256 of the client IP with a server-side secret, truncated. The raw IP is never stored.
+  ipHash          String? @db.VarChar(64)
+  turnstilePassed Boolean @default(false)
+
+  createdAt  DateTime @default(now())
+  /// Hard deletion date. A scheduled job purges rows past this date.
+  purgeAfter DateTime
+
+  @@index([status, createdAt])
+  @@index([purgeAfter])
+}

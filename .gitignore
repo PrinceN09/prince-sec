@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# next.js build output and caches
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# environment and secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# logs, editors, OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# local tooling
+.vercel
+
+# Local AI/build handoff files
+Claude outputs/
